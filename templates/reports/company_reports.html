@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Кабінет підприємства{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Кабінет підприємства</p>
+        <h1>Очікувані звіти</h1>
+        <p class="page-subtitle">Перелік форм, які потрібно подати за вибраний звітний період.</p>
+    </div>
+</div>
+
+<div class="card filter-card">
+    <div class="card-body">
+        <form class="toolbar" method="get">
+            <div class="field">
+                <label for="period">Період</label>
+                <select id="period" name="period">
+                    <option value="">Усі періоди</option>
+                    {% for period in periods %}
+                        <option value="{{ period.id }}" {% if selected_period == period.id|stringformat:"s" %}selected{% endif %}>{{ period.year }} {{ period.quarter }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit">Фільтрувати</button>
+        </form>
+    </div>
+</div>
+
+<div class="card table-card">
+    <div class="table-scroll">
+        <table>
+            <thead>
+            <tr>
+                <th>Організація</th>
+                <th>Період</th>
+                <th>Форма</th>
+                <th>Статус</th>
+                <th>Повідомлення</th>
+                <th>Дія</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for report in reports %}
+                <tr>
+                    <td>
+                        <div class="cell-title">{{ report.organization.name }}</div>
+                        <div class="cell-meta">{{ report.organization.edrpou }}</div>
+                    </td>
+                    <td>{{ report.period.year }} {{ report.period.quarter }}</td>
+                    <td>
+                        <div class="cell-title">{{ report.form.code }}</div>
+                        <div class="cell-meta">{{ report.form.xml_schema }}</div>
+                    </td>
+                    <td><span class="status-pill status-{{ report.status }}">{{ report.get_status_display }}</span></td>
+                    <td>{{ report.validation_message|default:"-" }}</td>
+                    <td><a class="button compact" href="{% url 'upload_report' report.id %}">Upload XML</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6"><div class="empty-state">Очікуваних звітів немає.</div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

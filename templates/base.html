@@ -1,0 +1,48 @@
+<!doctype html>
+{% load static %}
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Контроль фінансової звітності{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+</head>
+<body>
+{% block body %}
+<div class="app-shell">
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-mark">З</div>
+            <div>Контроль звітності</div>
+        </div>
+        <nav class="nav-list">
+            <a class="nav-link" href="{% url 'company_reports' %}">Кабінет підприємства</a>
+            {% if user.is_staff %}
+                <a class="nav-link" href="{% url 'admin_dashboard' %}">Dashboard</a>
+                <a class="nav-link" href="{% url 'generate_expected_reports' %}">Генерація звітів</a>
+                <a class="nav-link" href="{% url 'admin:index' %}">Django Admin</a>
+            {% endif %}
+        </nav>
+    </aside>
+    <div class="main-area">
+        <header class="topbar">
+            {% if user.is_authenticated %}
+                <span class="user-chip">{{ user.get_username }}</span>
+                <a class="button secondary compact" href="{% url 'logout' %}">Вийти</a>
+            {% else %}
+                <a class="button compact" href="{% url 'login' %}">Увійти</a>
+            {% endif %}
+        </header>
+        <main class="content">
+            {% if messages %}
+                <div class="messages">
+                    {% for message in messages %}<div class="message {{ message.tags }}">{{ message }}</div>{% endfor %}
+                </div>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+{% endblock %}
+</body>
+</html>

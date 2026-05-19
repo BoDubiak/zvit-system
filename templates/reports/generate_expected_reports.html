@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Генерація очікуваних звітів{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Адміністрування</p>
+        <h1>Згенерувати очікувані звіти</h1>
+        <p class="page-subtitle">Виберіть період, організації та форми. Якщо організації або форми не вибрані, система застосує стандартні правила.</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <div class="form-actions">
+                <button type="submit">Згенерувати</button>
+                <a class="button secondary" href="{% url 'admin_dashboard' %}">Скасувати</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

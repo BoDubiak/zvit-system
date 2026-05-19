@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Відхилити звіт{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Зміна статусу</p>
+        <h1>Відхилити звіт</h1>
+        <div class="detail-strip">
+            <span class="detail-chip">{{ report.organization.name }}</span>
+            <span class="detail-chip">{{ report.period.year }} {{ report.period.quarter }}</span>
+            <span class="detail-chip">{{ report.form.code }} / {{ report.form.xml_schema }}</span>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next_url }}">
+            {{ form.as_p }}
+            <div class="form-actions">
+                <button type="submit">Відхилити</button>
+                <a class="button secondary" href="{{ next_url }}">Скасувати</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Адміністрування</p>
+        <h1>Dashboard контролю</h1>
+        <p class="page-subtitle">Контроль подання, статусів, помилок і файлів по підприємствах.</p>
+    </div>
+    <div class="page-actions">
+        <a class="button" href="{% url 'generate_expected_reports' %}">Згенерувати звіти</a>
+    </div>
+</div>
+
+<div class="card filter-card">
+    <div class="card-body">
+        <form class="toolbar" method="get">
+            <div class="field">
+                <label for="period">Період</label>
+                <select id="period" name="period">
+                    <option value="">Усі періоди</option>
+                    {% for period in periods %}
+                        <option value="{{ period.id }}" {% if filters.period == period.id|stringformat:"s" %}selected{% endif %}>{{ period.year }} {{ period.quarter }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="status">Статус</label>
+                <select id="status" name="status">
+                    <option value="">Усі статуси</option>
+                    <option value="missing" {% if filters.status == "missing" %}selected{% endif %}>Тільки відсутні</option>
+                    <option value="errors" {% if filters.status == "errors" %}selected{% endif %}>Тільки помилки</option>
+                    <option value="uploaded" {% if filters.status == "uploaded" %}selected{% endif %}>Тільки завантажені</option>
+                    <option value="accepted" {% if filters.status == "accepted" %}selected{% endif %}>Тільки прийняті</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="form">Форма</label>
+                <select id="form" name="form">
+                    <option value="">Усі форми</option>
+                    {% for form in forms %}
+                        <option value="{{ form.id }}" {% if filters.form == form.id|stringformat:"s" %}selected{% endif %}>{{ form.code }} / {{ form.xml_schema }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="organization">Організація</label>
+                <input id="organization" name="organization" value="{{ filters.organization }}" placeholder="Назва або ЄДРПОУ">
+            </div>
+            <button type="submit">Фільтрувати</button>
+            {% if filters.period %}
+                <a class="button secondary" href="{% url 'export_control_report' %}?period={{ filters.period }}">Excel</a>
+                <a class="button secondary" href="{% url 'export_archives' %}?period={{ filters.period }}">ZIP</a>
+            {% else %}
+                <a class="button secondary" href="{% url 'export_archives' %}">ZIP</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<div class="card table-card">
+    <div class="table-scroll">
+        <table>
+            <thead>
+            <tr>
+                <th>Організація</th>
+                <th>ЄДРПОУ</th>
+                <th>Форма</th>
+                <th>Статус</th>
+                <th>Дата завантаження</th>
+                <th>Повідомлення</th>
+                <th>Дії</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for report in reports %}
+                <tr>
+                    <td><div class="cell-title">{{ report.organization.name }}</div></td>
+                    <td>{{ report.organization.edrpou }}</td>
+                    <td>
+                        <div class="cell-title">{{ report.form.code }}</div>
+                        <div class="cell-meta">{{ report.form.xml_schema }}</div>
+                    </td>
+                    <td><span class="status-pill status-{{ report.status }}">{{ report.get_status_display }}</span></td>
+                    <td>{{ report.uploaded_at|default:"-" }}</td>
+                    <td>{{ report.validation_message|default:"-" }}</td>
+                    <td>
+                        <div class="row-actions">
+                            {% if report.status != "accepted" %}
+                                <form method="post" action="{% url 'accept_expected_report' report.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button class="button compact" type="submit">Прийняти</button>
+                                </form>
+                            {% endif %}
+                            {% if report.status != "rejected" %}
+                                <a class="button secondary compact" href="{% url 'reject_expected_report' report.id %}?next={{ request.get_full_path|urlencode }}">Відхилити</a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7"><div class="empty-state">Даних за вибраними фільтрами немає.</div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if page_obj.has_other_pages %}
+    <nav class="pagination" aria-label="Pagination">
+        {% if page_obj.has_previous %}
+            <a class="button secondary compact" href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.previous_page_number }}">Назад</a>
+        {% endif %}
+        <span class="page-indicator">Сторінка {{ page_obj.number }} з {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+            <a class="button secondary compact" href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.next_page_number }}">Далі</a>
+        {% endif %}
+    </nav>
+{% endif %}
+{% endblock %}
