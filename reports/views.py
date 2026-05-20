@@ -11,6 +11,7 @@ from .excel import build_control_report
 from .forms import ExpectedReportUploadForm, GenerateExpectedReportsForm, RejectReportForm
 from .generation import MissingReportFormsError, generate_expected_reports
 from .models import ExpectedReport, OrganizationUser, ReportForm, ReportingPeriod
+from .permissions import can_manage_reports, manageable_reports, managed_organization_ids
 from .services import validate_uploaded_report
 from .status_services import accept_report, reject_report
 from .zip_export import build_all_periods_archives_bundle, build_archives_bundle
@@ -54,13 +55,9 @@ def upload_report(request, pk):
     return render(request, "reports/upload_report.html", {"form": form, "expected_report": expected_report})
 
 
-def _staff_required(user):
-    return user.is_staff
-
-
-@user_passes_test(_staff_required)
+@user_passes_test(can_manage_reports)
 def admin_dashboard(request):
-    reports = ExpectedReport.objects.select_related("organization", "period", "form", "uploaded_by").all()
+    reports = manageable_reports(request.user).select_related("organization", "period", "form", "uploaded_by")
     period_id = request.GET.get("period")
     status = request.GET.get("status")
     form_id = request.GET.get("form")
@@ -102,17 +99,17 @@ def admin_dashboard(request):
 
 
 @require_POST
-@user_passes_test(_staff_required)
+@user_passes_test(can_manage_reports)
 def accept_expected_report(request, pk):
-    report = get_object_or_404(ExpectedReport, pk=pk)
+    report = get_object_or_404(manageable_reports(request.user), pk=pk)
     accept_report(report, changed_by=request.user)
     messages.success(request, "Звіт позначено як прийнятий.")
     return redirect(request.POST.get("next") or "admin_dashboard")
 
 
-@user_passes_test(_staff_required)
+@user_passes_test(can_manage_reports)
 def reject_expected_report(request, pk):
-    report = get_object_or_404(ExpectedReport, pk=pk)
+    report = get_object_or_404(manageable_reports(request.user), pk=pk)
     next_url = request.POST.get("next") or request.GET.get("next") or "admin_dashboard"
     if request.method == "POST":
         form = RejectReportForm(request.POST)
@@ -126,16 +123,20 @@ def reject_expected_report(request, pk):
     return render(request, "reports/reject_report.html", {"form": form, "report": report, "next_url": next_url})
 
 
-@user_passes_test(_staff_required)
+@user_passes_test(can_manage_reports)
 def generate_expected_reports_view(request):
     if request.method == "POST":
-        form = GenerateExpectedReportsForm(request.POST)
+        form = GenerateExpectedReportsForm(request.POST, user=request.user)
         if form.is_valid():
+            organization_ids = list(form.cleaned_data["organizations"].values_list("id", flat=True))
+            allowed_organization_ids = managed_organization_ids(request.user)
+            if allowed_organization_ids is not None and not organization_ids:
+                organization_ids = allowed_organization_ids
             try:
                 result = generate_expected_reports(
                     year=form.cleaned_data["year"],
                     quarter=form.cleaned_data["quarter"],
-                    organization_ids=list(form.cleaned_data["organizations"].values_list("id", flat=True)),
+                    organization_ids=organization_ids,
                     form_ids=list(form.cleaned_data["report_forms"].values_list("id", flat=True)),
                 )
             except MissingReportFormsError as exc:
@@ -149,18 +150,18 @@ def generate_expected_reports_view(request):
                 )
                 return redirect("admin_dashboard")
     else:
-        form = GenerateExpectedReportsForm()
+        form = GenerateExpectedReportsForm(user=request.user)
 
     return render(request, "reports/generate_expected_reports.html", {"form": form})
 
 
-@user_passes_test(_staff_required)
+@user_passes_test(can_manage_reports)
 def export_control_report(request):
     period_id = request.GET.get("period")
     if not period_id:
         raise Http404("Період не вказано")
     period = get_object_or_404(ReportingPeriod, pk=period_id)
-    workbook = build_control_report(period)
+    workbook = build_control_report(period, organization_ids=managed_organization_ids(request.user))
     buffer = BytesIO()
     workbook.save(buffer)
     buffer.seek(0)
@@ -168,14 +169,15 @@ def export_control_report(request):
     return FileResponse(buffer, as_attachment=True, filename=filename)
 
 
-@user_passes_test(_staff_required)
+@user_passes_test(can_manage_reports)
 def export_archives_view(request):
     period_id = request.GET.get("period")
+    organization_ids = managed_organization_ids(request.user)
     if period_id:
         period = get_object_or_404(ReportingPeriod, pk=period_id)
-        buffer = BytesIO(build_archives_bundle(period))
+        buffer = BytesIO(build_archives_bundle(period, organization_ids=organization_ids))
         filename = f"archives_{period.year}_{period.quarter}.zip"
     else:
-        buffer = BytesIO(build_all_periods_archives_bundle())
+        buffer = BytesIO(build_all_periods_archives_bundle(organization_ids=organization_ids))
         filename = "archives_all_periods.zip"
     return FileResponse(buffer, as_attachment=True, filename=filename)

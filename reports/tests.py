@@ -9,7 +9,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .constants import DEFAULT_REPORT_FORMS
-from .models import ExpectedReport, Organization, ReportForm, ReportingPeriod, ReportStatusLog
+from .models import ExpectedReport, Organization, OrganizationUser, ReportForm, ReportingPeriod, ReportStatusLog
 from .services import normalized_report_filename, parse_financial_xml, validate_uploaded_report
 
 
@@ -44,6 +44,16 @@ class FinancialReportTests(TestCase):
 
     def login_staff(self):
         user = self.create_staff_user()
+        self.client.force_login(user)
+        return user
+
+    def login_organization_admin(self, organization=None):
+        user = get_user_model().objects.create_user(username="org-admin", password="pass")
+        OrganizationUser.objects.create(
+            user=user,
+            organization=organization or self.organization,
+            role=OrganizationUser.Role.ADMIN,
+        )
         self.client.force_login(user)
         return user
 
@@ -222,3 +232,49 @@ class FinancialReportTests(TestCase):
         content = b"".join(response.streaming_content)
         with ZipFile(BytesIO(content)) as bundle:
             self.assertIn("2025_Q2/J0900108.zip", bundle.namelist())
+
+    def test_organization_admin_dashboard_is_limited_to_managed_organizations(self):
+        self.login_organization_admin()
+        other = Organization.objects.create(name="Other", edrpou="99999999", report_type=Organization.ReportType.FULL)
+        ExpectedReport.objects.create(organization=other, period=self.period, form=self.form)
+
+        response = self.client.get(reverse("admin_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "20809229")
+        self.assertNotContains(response, "99999999")
+
+    def test_organization_admin_cannot_accept_unmanaged_report(self):
+        self.login_organization_admin()
+        other = Organization.objects.create(name="Other", edrpou="99999999", report_type=Organization.ReportType.FULL)
+        other_report = ExpectedReport.objects.create(organization=other, period=self.period, form=self.form)
+
+        response = self.client.post(reverse("accept_expected_report", args=[other_report.id]))
+        other_report.refresh_from_db()
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(other_report.status, ExpectedReport.Status.PENDING)
+
+    def test_organization_admin_generation_defaults_to_managed_organizations(self):
+        self.login_organization_admin()
+        Organization.objects.create(name="Other", edrpou="99999999", report_type=Organization.ReportType.FULL)
+
+        response = self.client.post(
+            reverse("generate_expected_reports"),
+            {"year": 2026, "quarter": "Q3"},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        period = ReportingPeriod.objects.get(year=2026, quarter="Q3")
+        self.assertEqual(ExpectedReport.objects.filter(period=period, organization=self.organization).count(), 2)
+        self.assertFalse(ExpectedReport.objects.filter(period=period, organization__edrpou="99999999").exists())
+
+    def test_representative_cannot_open_management_dashboard(self):
+        user = get_user_model().objects.create_user(username="representative", password="pass")
+        OrganizationUser.objects.create(user=user, organization=self.organization)
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("admin_dashboard"))
+
+        self.assertEqual(response.status_code, 302)

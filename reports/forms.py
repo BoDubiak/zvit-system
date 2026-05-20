@@ -1,6 +1,7 @@
 from django import forms as django_forms
 
 from .models import ExpectedReport, Organization, ReportForm, ReportingPeriod
+from .permissions import managed_organizations
 
 
 class ExpectedReportUploadForm(django_forms.ModelForm):
@@ -43,9 +44,9 @@ class GenerateExpectedReportsForm(django_forms.Form):
         help_text="Якщо нічого не вибрано, система використає правило за типом організації.",
         widget=django_forms.SelectMultiple(attrs={"size": 8}),
     )
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["organizations"].queryset = Organization.objects.filter(is_active=True).order_by("name")
+        self.fields["organizations"].queryset = managed_organizations(user).order_by("name")
         self.fields["report_forms"].queryset = ReportForm.objects.filter(is_active=True).order_by("code")
 
 
