@@ -7,6 +7,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from openpyxl import load_workbook
 
 from .constants import DEFAULT_REPORT_FORMS
 from .models import ExpectedReport, Organization, OrganizationUser, ReportForm, ReportingPeriod, ReportStatusLog
@@ -172,6 +173,42 @@ class FinancialReportTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "20809229")
         self.assertContains(response, "Завантажено")
+
+    def test_admin_dashboard_links_excel_export_before_period_filter(self):
+        self.login_staff()
+
+        response = self.client.get(reverse("admin_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'href="{reverse("export_control_report")}"')
+
+    def test_staff_can_export_excel_for_all_periods_from_site(self):
+        self.login_staff()
+        validate_uploaded_report(self.expected_report, xml_file())
+
+        response = self.client.get(reverse("export_control_report"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("control_report_all_periods.xlsx", response["Content-Disposition"])
+        content = b"".join(response.streaming_content)
+        workbook = load_workbook(BytesIO(content), read_only=True)
+        received_rows = list(workbook["received_files"].iter_rows(values_only=True))
+        self.assertIn(
+            (
+                self.organization.name,
+                self.organization.edrpou,
+                self.period.year,
+                str(self.period.quarter),
+                self.form.code,
+                self.form.xml_schema,
+                str(ExpectedReport.Status.UPLOADED),
+                "report.xml",
+                "20809229-2025-Q2.XML",
+                self.expected_report.uploaded_at.isoformat(),
+                None,
+            ),
+            received_rows,
+        )
 
     def test_staff_can_accept_report_from_dashboard(self):
         user = self.login_staff()

@@ -3,12 +3,13 @@ from openpyxl import Workbook
 from .models import ExpectedReport
 
 
-def build_control_report(period, organization_ids=None):
+def build_control_report(period=None, organization_ids=None):
     reports = (
         ExpectedReport.objects.select_related("organization", "period", "form", "uploaded_by")
-        .filter(period=period)
-        .order_by("organization__name", "form__code")
+        .order_by("period__year", "period__quarter", "organization__name", "form__code")
     )
+    if period is not None:
+        reports = reports.filter(period=period)
     if organization_ids is not None:
         reports = reports.filter(organization_id__in=organization_ids)
 

@@ -49,13 +49,16 @@
                 <label for="organization">Організація</label>
                 <input id="organization" name="organization" value="{{ filters.organization }}" placeholder="Назва або ЄДРПОУ">
             </div>
-            <button type="submit">Фільтрувати</button>
-            {% if filters.period %}
-                <a class="button secondary" href="{% url 'export_control_report' %}?period={{ filters.period }}">Excel</a>
-                <a class="button secondary" href="{% url 'export_archives' %}?period={{ filters.period }}">ZIP</a>
-            {% else %}
-                <a class="button secondary" href="{% url 'export_archives' %}">ZIP</a>
-            {% endif %}
+            <div class="toolbar-actions">
+                <button type="submit">Фільтрувати</button>
+                {% if filters.period %}
+                    <a class="button secondary" href="{% url 'export_control_report' %}?period={{ filters.period }}">Excel</a>
+                    <a class="button secondary" href="{% url 'export_archives' %}?period={{ filters.period }}">ZIP</a>
+                {% else %}
+                    <a class="button secondary" href="{% url 'export_control_report' %}">Excel</a>
+                    <a class="button secondary" href="{% url 'export_archives' %}">ZIP</a>
+                {% endif %}
+            </div>
         </form>
     </div>
 </div>

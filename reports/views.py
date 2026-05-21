@@ -3,7 +3,7 @@ from io import BytesIO
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator
-from django.http import FileResponse, Http404
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -158,14 +158,12 @@ def generate_expected_reports_view(request):
 @user_passes_test(can_manage_reports)
 def export_control_report(request):
     period_id = request.GET.get("period")
-    if not period_id:
-        raise Http404("Період не вказано")
-    period = get_object_or_404(ReportingPeriod, pk=period_id)
+    period = get_object_or_404(ReportingPeriod, pk=period_id) if period_id else None
     workbook = build_control_report(period, organization_ids=managed_organization_ids(request.user))
     buffer = BytesIO()
     workbook.save(buffer)
     buffer.seek(0)
-    filename = f"control_report_{period.year}_{period.quarter}.xlsx"
+    filename = f"control_report_{period.year}_{period.quarter}.xlsx" if period else "control_report_all_periods.xlsx"
     return FileResponse(buffer, as_attachment=True, filename=filename)
 
 
