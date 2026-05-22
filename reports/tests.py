@@ -225,6 +225,25 @@ class FinancialReportTests(TestCase):
         self.assertEqual(status_log.old_status, ExpectedReport.Status.UPLOADED)
         self.assertEqual(status_log.new_status, ExpectedReport.Status.ACCEPTED)
 
+    def test_staff_cannot_accept_pending_report_without_file(self):
+        self.login_staff()
+
+        response = self.client.post(reverse("accept_expected_report", args=[self.expected_report.id]), follow=True)
+        self.expected_report.refresh_from_db()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.expected_report.status, ExpectedReport.Status.PENDING)
+        self.assertFalse(ReportStatusLog.objects.filter(expected_report=self.expected_report).exists())
+        self.assertContains(response, "Прийняти можна тільки завантажений звіт із файлом.")
+
+    def test_admin_dashboard_hides_accept_button_for_pending_report(self):
+        self.login_staff()
+
+        response = self.client.get(reverse("admin_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, reverse("accept_expected_report", args=[self.expected_report.id]))
+
     def test_staff_can_reject_report_from_dashboard(self):
         user = self.login_staff()
         validate_uploaded_report(self.expected_report, xml_file())

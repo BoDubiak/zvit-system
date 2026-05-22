@@ -91,7 +91,7 @@
                     <td>{{ report.validation_message|default:"-" }}</td>
                     <td>
                         <div class="row-actions">
-                            {% if report.status != "accepted" %}
+                            {% if report.status == "uploaded" and report.uploaded_file %}
                                 <form method="post" action="{% url 'accept_expected_report' report.id %}">
                                     {% csrf_token %}
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">

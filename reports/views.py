@@ -2,6 +2,7 @@ from io import BytesIO
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -102,8 +103,12 @@ def admin_dashboard(request):
 @user_passes_test(can_manage_reports)
 def accept_expected_report(request, pk):
     report = get_object_or_404(manageable_reports(request.user), pk=pk)
-    accept_report(report, changed_by=request.user)
-    messages.success(request, "Звіт позначено як прийнятий.")
+    try:
+        accept_report(report, changed_by=request.user)
+    except ValidationError as exc:
+        messages.error(request, exc.messages[0])
+    else:
+        messages.success(request, "Звіт позначено як прийнятий.")
     return redirect(request.POST.get("next") or "admin_dashboard")
 
 

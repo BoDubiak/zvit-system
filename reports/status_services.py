@@ -1,3 +1,5 @@
+from django.core.exceptions import ValidationError
+
 from .models import ExpectedReport, ReportStatusLog
 
 
@@ -18,6 +20,8 @@ def change_report_status(expected_report, new_status, changed_by=None, comment="
 
 
 def accept_report(expected_report, changed_by=None, comment="Звіт прийнято адміністратором"):
+    if expected_report.status != ExpectedReport.Status.UPLOADED or not expected_report.uploaded_file:
+        raise ValidationError("Прийняти можна тільки завантажений звіт із файлом.")
     return change_report_status(
         expected_report=expected_report,
         new_status=ExpectedReport.Status.ACCEPTED,
