@@ -79,13 +79,13 @@ class ReportingPeriod(models.Model):
 
 
 def report_upload_path(instance, filename):
-    return f"reports/{instance.period.year}/{instance.period.quarter}/{instance.organization.edrpou}/{filename}"
+    return f"reports/{instance.form.code}/{instance.period.year}/{instance.period.quarter}/{instance.organization.edrpou}/{filename}"
 
 
 def log_upload_path(instance, filename):
     report = instance.expected_report
     ts = timezone.now().strftime("%Y%m%d%H%M%S")
-    return f"upload_logs/{report.period.year}/{report.period.quarter}/{report.organization.edrpou}/{ts}_{filename}"
+    return f"upload_logs/{report.form.code}/{report.period.year}/{report.period.quarter}/{report.organization.edrpou}/{ts}_{filename}"
 
 
 class ExpectedReport(models.Model):

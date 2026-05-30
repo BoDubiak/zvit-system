@@ -6,7 +6,7 @@ from django.core.files.base import ContentFile
 from django.utils import timezone
 
 from .constants import QUARTER_BY_MONTH
-from .models import ExpectedReport, ReportUploadLog
+from .models import ExpectedReport, ReportUploadLog, report_upload_path
 
 
 class XMLParseError(ValueError):
@@ -117,6 +117,13 @@ def validate_uploaded_report(expected_report, uploaded_file, uploaded_by=None, a
     if hasattr(uploaded_file, "seek"):
         uploaded_file.seek(0)
     content = uploaded_file.read()
+    storage = expected_report.uploaded_file.storage
+    target_name = report_upload_path(expected_report, filename)
+    current_name = expected_report.uploaded_file.name
+    if current_name and current_name != target_name:
+        storage.delete(current_name)
+    if storage.exists(target_name):
+        storage.delete(target_name)
     expected_report.uploaded_file.save(filename, ContentFile(content), save=False)
     expected_report.original_filename = original_filename
     expected_report.normalized_filename = filename

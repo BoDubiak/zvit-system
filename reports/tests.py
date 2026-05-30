@@ -81,6 +81,15 @@ class FinancialReportTests(TestCase):
         self.assertEqual(self.expected_report.status, ExpectedReport.Status.UPLOADED)
         self.assertEqual(self.expected_report.normalized_filename, "20809229-2025-Q2.XML")
         self.assertEqual(self.expected_report.upload_logs.count(), 1)
+        self.assertEqual(
+            self.expected_report.uploaded_file.name,
+            "reports/J0900108/2025/Q2/20809229/20809229-2025-Q2.XML",
+        )
+        self.assertTrue(
+            self.expected_report.upload_logs.get().file.name.startswith(
+                "upload_logs/J0900108/2025/Q2/20809229/"
+            )
+        )
 
     def test_validation_error_when_edrpou_mismatch(self):
         ok, message = validate_uploaded_report(self.expected_report, xml_file(edrpou="01984300"))
@@ -89,6 +98,17 @@ class FinancialReportTests(TestCase):
         self.assertFalse(ok)
         self.assertIn("Очікується ЄДРПОУ 20809229", message)
         self.assertEqual(self.expected_report.status, ExpectedReport.Status.REJECTED)
+
+    def test_repeated_upload_overwrites_current_file_at_stable_path(self):
+        validate_uploaded_report(self.expected_report, xml_file())
+        validate_uploaded_report(self.expected_report, xml_file())
+        self.expected_report.refresh_from_db()
+
+        self.assertEqual(
+            self.expected_report.uploaded_file.name,
+            "reports/J0900108/2025/Q2/20809229/20809229-2025-Q2.XML",
+        )
+        self.assertEqual(self.expected_report.upload_logs.count(), 2)
 
     def test_validation_error_when_form_mismatch(self):
         ok, message = validate_uploaded_report(self.expected_report, xml_file(schema="S0100215"))
