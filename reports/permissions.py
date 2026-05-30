@@ -9,6 +9,12 @@ def can_manage_reports(user):
     return OrganizationUser.objects.filter(user=user, role=OrganizationUser.Role.ADMIN).exists()
 
 
+def can_view_company_reports(user):
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return OrganizationUser.objects.filter(user=user).exists()
+
+
 def managed_organization_ids(user):
     if not getattr(user, "is_authenticated", False):
         return []

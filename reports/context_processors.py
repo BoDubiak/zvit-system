@@ -1,5 +1,8 @@
-from .permissions import can_manage_reports
+from .permissions import can_manage_reports, can_view_company_reports
 
 
 def report_permissions(request):
-    return {"can_manage_reports": can_manage_reports(request.user)}
+    return {
+        "can_manage_reports": can_manage_reports(request.user),
+        "can_view_company_reports": can_view_company_reports(request.user),
+    }

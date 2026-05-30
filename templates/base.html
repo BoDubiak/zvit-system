@@ -16,7 +16,9 @@
             <div>Контроль звітності</div>
         </div>
         <nav class="nav-list">
-            <a class="nav-link" href="{% url 'company_reports' %}">Кабінет підприємства</a>
+            {% if can_view_company_reports %}
+                <a class="nav-link" href="{% url 'company_reports' %}">Кабінет підприємства</a>
+            {% endif %}
             {% if can_manage_reports %}
                 <a class="nav-link" href="{% url 'admin_dashboard' %}">Dashboard</a>
                 <a class="nav-link" href="{% url 'generate_expected_reports' %}">Генерація звітів</a>

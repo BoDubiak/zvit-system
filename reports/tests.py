@@ -194,6 +194,20 @@ class FinancialReportTests(TestCase):
         self.assertContains(response, "20809229")
         self.assertContains(response, "Завантажено")
 
+    def test_staff_without_organization_is_redirected_to_admin_dashboard(self):
+        self.login_staff()
+
+        response = self.client.get(reverse("company_reports"))
+
+        self.assertRedirects(response, reverse("admin_dashboard"))
+
+    def test_staff_without_organization_does_not_see_company_dashboard_link(self):
+        self.login_staff()
+
+        response = self.client.get(reverse("admin_dashboard"))
+
+        self.assertNotContains(response, f'href="{reverse("company_reports")}"')
+
     def test_admin_dashboard_links_excel_export_before_period_filter(self):
         self.login_staff()
 

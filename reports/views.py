@@ -12,7 +12,7 @@ from .excel import build_control_report
 from .forms import ExpectedReportUploadForm, GenerateExpectedReportsForm, RejectReportForm
 from .generation import MissingReportFormsError, generate_expected_reports
 from .models import ExpectedReport, OrganizationUser, ReportForm, ReportingPeriod
-from .permissions import can_manage_reports, manageable_reports, managed_organization_ids
+from .permissions import can_manage_reports, can_view_company_reports, manageable_reports, managed_organization_ids
 from .services import validate_uploaded_report
 from .status_services import accept_report, reject_report
 from .zip_export import build_all_periods_archives_bundle, build_archives_bundle
@@ -24,6 +24,8 @@ def _user_organizations(user):
 
 @login_required
 def company_reports(request):
+    if not can_view_company_reports(request.user) and can_manage_reports(request.user):
+        return redirect("admin_dashboard")
     organization_links = _user_organizations(request.user)
     organizations = [link.organization for link in organization_links]
     period_id = request.GET.get("period")
