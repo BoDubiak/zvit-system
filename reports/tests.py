@@ -281,13 +281,25 @@ class FinancialReportTests(TestCase):
     def test_staff_can_export_zip_archives_for_all_periods_from_site(self):
         self.login_staff()
         validate_uploaded_report(self.expected_report, xml_file())
+        other_period = ReportingPeriod.objects.create(year=2025, quarter=ReportingPeriod.Quarter.Q1)
+        other_report = ExpectedReport.objects.create(
+            organization=self.organization,
+            period=other_period,
+            form=self.form,
+        )
+        validate_uploaded_report(other_report, xml_file(month="03"))
 
         response = self.client.get(reverse("export_archives"))
 
         self.assertEqual(response.status_code, 200)
         content = b"".join(response.streaming_content)
         with ZipFile(BytesIO(content)) as bundle:
-            self.assertIn("2025_Q2/J0900108.zip", bundle.namelist())
+            self.assertIn("J0900108.zip", bundle.namelist())
+            self.assertNotIn("2025_Q2/J0900108.zip", bundle.namelist())
+            with bundle.open("J0900108.zip") as form_zip_file:
+                with ZipFile(BytesIO(form_zip_file.read())) as form_zip:
+                    self.assertIn("20809229-2025-Q1.XML", form_zip.namelist())
+                    self.assertIn("20809229-2025-Q2.XML", form_zip.namelist())
 
     def test_organization_admin_dashboard_is_limited_to_managed_organizations(self):
         self.login_organization_admin()

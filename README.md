@@ -216,7 +216,7 @@ python manage.py export_control_report --year 2025 --quarter Q2
 Через сайт: відкрийте `/dashboard/` і натисніть кнопку `ZIP`.
 
 - якщо період вибраний, буде створено архів тільки за цей період;
-- якщо вибрано `Усі періоди`, буде створено `archives_all_periods.zip` з папками по періодах.
+- якщо вибрано `Усі періоди`, буде створено `archives_all_periods.zip` без підпапок: один ZIP на кожен тип звіту з файлами за всі періоди.
 
 ```bash
 python manage.py export_archives --year 2025 --quarter Q2

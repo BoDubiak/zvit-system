@@ -4,7 +4,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.conf import settings
 
-from .models import ExpectedReport, ReportingPeriod
+from .models import ExpectedReport
 
 
 def export_archives(period, output_dir=None, organization_ids=None):
@@ -49,16 +49,26 @@ def build_archives_bundle(period, organization_ids=None):
 
 
 def build_all_periods_archives_bundle(organization_ids=None):
-    periods = ReportingPeriod.objects.filter(expected_reports__uploaded_file__gt="").distinct().order_by("year", "quarter")
+    reports = (
+        ExpectedReport.objects.select_related("organization", "period", "form")
+        .filter(
+            status__in=[ExpectedReport.Status.ACCEPTED, ExpectedReport.Status.UPLOADED],
+        )
+        .exclude(uploaded_file="")
+    )
     if organization_ids is not None:
-        periods = periods.filter(expected_reports__organization_id__in=organization_ids)
+        reports = reports.filter(organization_id__in=organization_ids)
     with TemporaryDirectory() as tmpdir:
         root_path = Path(tmpdir)
         bundle_path = root_path / "archives_all_periods.zip"
         with ZipFile(bundle_path, "w", ZIP_DEFLATED) as bundle:
-            for period in periods:
-                period_dir = root_path / f"{period.year}_{period.quarter}"
-                archive_paths = export_archives(period, output_dir=period_dir, organization_ids=organization_ids)
-                for archive_path in archive_paths:
-                    bundle.write(archive_path, arcname=f"{period.year}_{period.quarter}/{archive_path.name}")
+            for code in reports.values_list("form__code", flat=True).distinct():
+                archive_path = root_path / f"{code}.zip"
+                with ZipFile(archive_path, "w", ZIP_DEFLATED) as archive:
+                    for report in reports.filter(form__code=code):
+                        inner_name = report.normalized_filename or (
+                            f"{report.organization.edrpou}-{report.period.year}-{report.period.quarter}.XML"
+                        )
+                        archive.write(report.uploaded_file.path, arcname=inner_name)
+                bundle.write(archive_path, arcname=archive_path.name)
         return bundle_path.read_bytes()
