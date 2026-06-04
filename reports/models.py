@@ -125,6 +125,35 @@ class ExpectedReport(models.Model):
         return f"{self.organization} - {self.period} - {self.form}"
 
 
+class EmailNotification(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Очікує"
+        SENDING = "sending", "Надсилається"
+        SENT = "sent", "Надіслано"
+        FAILED = "failed", "Помилка"
+
+    class Type(models.TextChoices):
+        EXPECTED_REPORTS_CREATED = "expected_reports_created", "Нові завдання зі звітності"
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="email_notifications")
+    period = models.ForeignKey(ReportingPeriod, on_delete=models.CASCADE, related_name="email_notifications")
+    notification_type = models.CharField(max_length=50, choices=Type.choices)
+    recipients = models.JSONField(default=list)
+    subject = models.CharField(max_length=255)
+    body = models.TextField()
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    attempts = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.subject} ({self.status})"
+
+
 class ReportUploadLog(models.Model):
     expected_report = models.ForeignKey(ExpectedReport, on_delete=models.CASCADE, related_name="upload_logs")
     file = models.FileField(upload_to=log_upload_path)

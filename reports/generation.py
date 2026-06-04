@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 
+from django.db import transaction
+
 from .constants import FULL_OPTIONAL_REPORT_SCHEMAS, FULL_REQUIRED_REPORT_SCHEMAS, SMALL_REPORT_SCHEMA
 from .models import ExpectedReport, Organization, ReportForm, ReportingPeriod
+from .notifications import queue_expected_reports_created_notifications
 
 
 @dataclass(frozen=True)
@@ -45,6 +48,7 @@ def generate_expected_reports(year, quarter, include_optional=False, organizatio
 
     used_schema_count = set()
     organization_count = 0
+    created_reports = []
     for organization in organizations:
         organization_count += 1
         schemas = selected_schemas or (
@@ -52,15 +56,19 @@ def generate_expected_reports(year, quarter, include_optional=False, organizatio
         )
         used_schema_count.update(schemas)
         for schema in schemas:
-            _, was_created = ExpectedReport.objects.get_or_create(
+            expected_report, was_created = ExpectedReport.objects.get_or_create(
                 organization=organization,
                 period=period,
                 form=forms_by_schema[schema],
             )
             if was_created:
                 created += 1
+                created_reports.append(expected_report)
             else:
                 existing += 1
+
+    if created_reports:
+        transaction.on_commit(lambda: queue_expected_reports_created_notifications(created_reports))
 
     return GenerateExpectedReportsResult(
         period=period,

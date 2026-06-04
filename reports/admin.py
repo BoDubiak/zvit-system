@@ -1,6 +1,7 @@
 from django.contrib import admin, messages
 
 from .models import (
+    EmailNotification,
     ExpectedReport,
     Organization,
     OrganizationUser,
@@ -90,6 +91,35 @@ class ExpectedReportAdmin(admin.ModelAdmin):
             validate_uploaded_report(obj, uploaded_file, uploaded_by=request.user)
             return
         super().save_model(request, obj, form, change)
+
+
+@admin.register(EmailNotification)
+class EmailNotificationAdmin(admin.ModelAdmin):
+    list_display = [
+        "subject",
+        "organization",
+        "period",
+        "notification_type",
+        "status",
+        "attempts",
+        "created_at",
+        "sent_at",
+    ]
+    list_filter = ["status", "notification_type", "period", "created_at", "sent_at"]
+    search_fields = ["subject", "organization__name", "organization__edrpou", "recipients", "last_error"]
+    readonly_fields = [
+        "organization",
+        "period",
+        "notification_type",
+        "recipients",
+        "subject",
+        "body",
+        "status",
+        "attempts",
+        "last_error",
+        "created_at",
+        "sent_at",
+    ]
 
 
 @admin.register(ReportUploadLog)

@@ -266,6 +266,50 @@ ruff check .
 - `python manage.py check`
 - `python manage.py test`
 
+## Email notifications
+
+Після генерації нових `ExpectedReport` система не надсилає листи одразу в web request. Замість цього створюються записи `EmailNotification` зі статусом `pending`. Це дає БД-чергу листів, яку можна переглядати в Django Admin і обробляти окремою management-командою.
+
+Отримувачі формуються з:
+
+- `Organization.contact_email`;
+- email користувачів, прив'язаних до організації через `OrganizationUser`.
+
+Листи групуються: одна організація отримує один лист за період із переліком нових форм.
+
+Для локальної розробки в `.env` можна залишити console backend:
+
+```env
+EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+```
+
+Для production потрібно задати SMTP:
+
+```env
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.example.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=system@example.com
+EMAIL_HOST_PASSWORD=password
+EMAIL_USE_TLS=true
+DEFAULT_FROM_EMAIL=system@example.com
+```
+
+Відправка queued-листів запускається командою:
+
+```bash
+python manage.py send_email_notifications --limit 50 --retry-failed
+```
+
+Рекомендовано запускати її кожні 5 хвилин через cron, systemd timer, Windows Task Scheduler або окремий scheduler у Docker-оточенні.
+
+Статуси черги:
+
+- `pending`: очікує відправки;
+- `sending`: взято в обробку;
+- `sent`: успішно надіслано;
+- `failed`: помилка відправки, текст помилки зберігається в `last_error`.
+
 ## Production checklist
 
 Перед реальним production-запуском:
@@ -277,4 +321,6 @@ ruff check .
 - використовуйте PostgreSQL, а не SQLite;
 - налаштуйте reverse proxy та HTTPS;
 - зберігайте `media/` на persistent storage;
+- задайте SMTP env-змінні для email notifications;
+- налаштуйте періодичний запуск `send_email_notifications`;
 - додайте регулярний backup PostgreSQL і `media/`.

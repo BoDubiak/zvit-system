@@ -3,6 +3,7 @@ from io import BytesIO
 from zipfile import ZipFile
 
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import TestCase, override_settings
@@ -10,7 +11,15 @@ from django.urls import reverse
 from openpyxl import load_workbook
 
 from .constants import DEFAULT_REPORT_FORMS
-from .models import ExpectedReport, Organization, OrganizationUser, ReportForm, ReportingPeriod, ReportStatusLog
+from .models import (
+    EmailNotification,
+    ExpectedReport,
+    Organization,
+    OrganizationUser,
+    ReportForm,
+    ReportingPeriod,
+    ReportStatusLog,
+)
 from .services import normalized_report_filename, parse_financial_xml, validate_uploaded_report
 
 
@@ -132,6 +141,52 @@ class FinancialReportTests(TestCase):
         )
         self.assertEqual(small_reports.count(), 1)
         self.assertEqual(small_reports.get().form.xml_schema, "S0110014")
+
+    def test_generate_expected_reports_queues_grouped_email_notification(self):
+        self.organization.contact_email = "contact@example.com"
+        self.organization.save(update_fields=["contact_email"])
+        user = get_user_model().objects.create_user(
+            username="notified-user",
+            password="pass",
+            email="user@example.com",
+        )
+        OrganizationUser.objects.create(user=user, organization=self.organization)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            call_command("generate_expected_reports", year=2026, quarter="Q1", verbosity=0)
+
+        notification = EmailNotification.objects.get()
+        self.assertEqual(notification.organization, self.organization)
+        self.assertEqual(notification.period.year, 2026)
+        self.assertEqual(notification.period.quarter, "Q1")
+        self.assertEqual(notification.status, EmailNotification.Status.PENDING)
+        self.assertCountEqual(notification.recipients, ["contact@example.com", "user@example.com"])
+        self.assertIn("J0900108", notification.body)
+        self.assertIn("J0900207", notification.body)
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="system@example.com",
+    )
+    def test_send_email_notifications_command_sends_pending_notification(self):
+        notification = EmailNotification.objects.create(
+            organization=self.organization,
+            period=self.period,
+            notification_type=EmailNotification.Type.EXPECTED_REPORTS_CREATED,
+            recipients=["user@example.com"],
+            subject="Test notification",
+            body="Notification body",
+        )
+
+        call_command("send_email_notifications", verbosity=0)
+
+        notification.refresh_from_db()
+        self.assertEqual(notification.status, EmailNotification.Status.SENT)
+        self.assertEqual(notification.attempts, 1)
+        self.assertIsNotNone(notification.sent_at)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].subject, "Test notification")
+        self.assertEqual(mail.outbox[0].to, ["user@example.com"])
 
     def test_generate_expected_reports_can_include_optional_full_forms(self):
         call_command("generate_expected_reports", year=2025, quarter="Q2", include_optional=True, verbosity=0)
